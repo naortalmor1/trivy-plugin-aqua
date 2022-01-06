@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -29,16 +28,16 @@ const (
 	resultsFile = "results.json"
 )
 
-func Scan(path, severities string, debug bool) (report.Results, error) {
+func Scan(context *cli.Context, path string) (report.Results, error) {
 
 	initializeScanner := initializeFilesystemScanner(path, policyDir, dataDir)
 
-	opt, err := createScanOptions(severities, debug)
+	opt, err := createScanOptions(context)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed creating scan options")
 	}
 
-	err = artifact.Run(context.Background(), opt, initializeScanner, initAquaCache())
+	err = artifact.Run(context.Context, opt, initializeScanner, initAquaCache())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed running scan")
 	}
@@ -84,22 +83,8 @@ func initializeFilesystemScanner(dir, _, _ string) artifact.InitializeScanner {
 	}
 }
 
-func createScanOptions(severities string, debug bool) (artifact.Option, error) {
-	app := cli.NewApp()
-	set := flag.NewFlagSet("test", 0)
-	set.Bool("quiet", false, "")
-	set.Bool("debug", debug, "")
-	set.String("severity", severities, "")
-	set.String("vuln-type", "os,library", "")
-	set.String("security-checks", "config", "")
-	set.String("format", "table", "")
-	set.Bool("skip-update", false, "")
-	set.String("timeout", "5m0s", "")
-	set.String("input", "input", "")
-
-	ctx := cli.NewContext(app, set, nil)
-
-	opt, err := artifact.NewOption(ctx)
+func createScanOptions(context *cli.Context) (artifact.Option, error) {
+	opt, err := artifact.NewOption(context)
 	if err != nil {
 		return opt, err
 	}

@@ -56,7 +56,7 @@ func main() {
 			return err
 		}
 
-		results, err := scanner.Scan(scanPath, severities, debug)
+		results, err := scanner.Scan(context, scanPath)
 		if err != nil {
 			return err
 		}
