@@ -29,6 +29,7 @@ const (
 )
 
 func Scan(context *cli.Context, path string) (report.Results, error) {
+	downloadAquaPolicies(policyDir)
 
 	initializeScanner := initializeFilesystemScanner(path, policyDir, dataDir)
 
@@ -69,8 +70,14 @@ func Scan(context *cli.Context, path string) (report.Results, error) {
 
 }
 
-func initializeFilesystemScanner(dir, _, _ string) artifact.InitializeScanner {
+func downloadAquaPolicies(dst string) {
+	// Download policies from Aqua to the "dst" directory
+}
+
+func initializeFilesystemScanner(dir, aquaPolicyDir, _ string) artifact.InitializeScanner {
 	return func(ctx context.Context, target string, artifactCache cache.ArtifactCache, localArtifactCache cache.LocalArtifactCache, timeout time.Duration, option fanalartifact.Option, configScannerOption fanalconfig.ScannerOption) (scanner.Scanner, func(), error) {
+		// Update the policy dir to add Aqua's custom policies
+		configScannerOption.PolicyPaths = append(configScannerOption.PolicyPaths, aquaPolicyDir)
 
 		fs, err := local.NewArtifact(dir, artifactCache, option, configScannerOption)
 		if err != nil {
