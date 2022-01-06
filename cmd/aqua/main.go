@@ -2,19 +2,17 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"sort"
 
 	"strings"
 
-	"github.com/aquasecurity/trivy-plugin-aqua/pkg/proto/buildsecurity"
+	"github.com/urfave/cli/v2"
 
-	"github.com/aquasecurity/trivy-plugin-aqua/pkg/buildClient"
-	"github.com/aquasecurity/trivy-plugin-aqua/pkg/log"
-	"github.com/aquasecurity/trivy-plugin-aqua/pkg/processor"
+	"github.com/aquasecurity/trivy-plugin-aqua/pkg/proto/buildsecurity"
 	"github.com/aquasecurity/trivy-plugin-aqua/pkg/scanner"
-	"github.com/aquasecurity/trivy-plugin-aqua/pkg/uploader"
-	"github.com/spf13/cobra"
+	"github.com/aquasecurity/trivy/pkg/commands"
 )
 
 var (
@@ -24,64 +22,37 @@ var (
 	tags             map[string]string
 )
 
-func init() {
-	rootCmd.PersistentFlags().StringVar(&severities, "severities", strings.Join(scanner.AllSeverities, ","), "Minimum severity to display misconfigurations for")
-	rootCmd.PersistentFlags().BoolVarP(&skipResultUpload, "skip-result-upload", "s", false, "Add this flag if you want test failed policy locally before sending PR")
-	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "v", false, "Display debug output")
-	rootCmd.PersistentFlags().StringToStringVarP(&tags, "tags", "t", nil, "Add arbitrary tags to the scan; --tags key1=val1,key2=val2")
-}
-
 func main() {
-	if err := rootCmd.Execute(); err != nil {
-		os.Exit(1)
+	app := cli.NewApp()
+	app.Name = "aqua"
+	app.Version = "0.0.1"
+	app.ArgsUsage = "target"
+	app.Usage = "Scan a filesystem location for vulnerabilities and config misconfiguration"
+	app.EnableBashCompletion = true
+
+	configCmd := commands.NewConfigCommand()
+	configCmd.Action = func(context *cli.Context) error {
+		// Do something
+		return nil
 	}
-}
+	configCmd.Flags = append(configCmd.Flags,
+		&cli.StringFlag{
+			Name:    "skip-result-upload",
+			Aliases: []string{"s"},
+			Usage:   "Add this flag if you want test failed policy locally before sending PR",
+			EnvVars: []string{"TRIVY_SKIP_RESULT_UPLOAD"},
+		},
+		// Add any flags you want here
+	)
 
-var rootCmd = &cobra.Command{
-	Use:          "aqua <scanPath>",
-	Short:        "Scan a filesystem location for vulnerabilities and config misconfiguration",
-	Hidden:       true,
-	SilenceUsage: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := log.InitLogger(debug, false); err != nil {
-			return err
-		}
+	app.Commands = []*cli.Command{
+		configCmd,
+	}
 
-		if err := verifySeverities(); err != nil {
-			return err
-		}
-
-		scanPath, _ := os.Getwd()
-		if len(args) > 0 {
-			// when scan path provided, use that
-			scanPath = args[0]
-		}
-		log.Logger.Debugf("Using scanPath %s", scanPath)
-
-		client, err := buildClient.Get(scanPath)
-		if err != nil {
-			return err
-		}
-
-		results, err := scanner.Scan(scanPath, severities, debug)
-		if err != nil {
-			return err
-		}
-
-		processedResults := processor.ProcessResults(client, results)
-		if err != nil {
-			return err
-		}
-
-		if !skipResultUpload {
-			if err := uploader.Upload(client, processedResults, tags); err != nil {
-				return err
-			}
-		}
-
-		return checkPolicyResults(processedResults)
-	},
-	Args: cobra.ExactArgs(1),
+	err := app.Run(os.Args)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func verifySeverities() error {
