@@ -23,13 +23,15 @@ import (
 )
 
 const (
-	policyDir   = "/tmp/policies"
-	dataDir     = "/tmp/data"
-	resultsFile = "results.json"
+	policyDir     = "/tmp/policies"
+	exitPolicyDir = "/tmp/somewhre"
+	dataDir       = "/tmp/data"
+	resultsFile   = "results.json"
 )
 
 func Scan(context *cli.Context, path string) (report.Results, error) {
-	downloadAquaPolicies(policyDir)
+	downloadAquaRegoPolicies(policyDir)
+	downloadAquaExitPolicies(exitPolicyDir)
 
 	initializeScanner := initializeFilesystemScanner(path, policyDir, dataDir)
 
@@ -66,12 +68,24 @@ func Scan(context *cli.Context, path string) (report.Results, error) {
 		return nil, errors.Wrap(err, "failed unmarshaling results file")
 	}
 
+	// Propagate the result to Trivy OSS somehow so that Trivy will fail with the specified exit code.
+	shouldFail(results)
+
 	return results, nil
 
 }
 
-func downloadAquaPolicies(dst string) {
-	// Download policies from Aqua to the "dst" directory
+func downloadAquaRegoPolicies(dst string) {
+	// Download Rego policies from Aqua to the "dst" directory
+}
+
+func downloadAquaExitPolicies(dst string) {
+	// Download failure policies
+}
+
+func shouldFail(results report.Results) bool {
+	// Check results with the exit policies
+	return true
 }
 
 func initializeFilesystemScanner(dir, aquaPolicyDir, _ string) artifact.InitializeScanner {
