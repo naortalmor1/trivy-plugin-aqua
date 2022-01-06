@@ -10,9 +10,13 @@ import (
 
 	"github.com/urfave/cli/v2"
 
+	"github.com/aquasecurity/trivy-plugin-aqua/pkg/buildClient"
+	"github.com/aquasecurity/trivy-plugin-aqua/pkg/processor"
 	"github.com/aquasecurity/trivy-plugin-aqua/pkg/proto/buildsecurity"
 	"github.com/aquasecurity/trivy-plugin-aqua/pkg/scanner"
+	"github.com/aquasecurity/trivy-plugin-aqua/pkg/uploader"
 	"github.com/aquasecurity/trivy/pkg/commands"
+	tlog "github.com/aquasecurity/trivy/pkg/log"
 )
 
 var (
@@ -32,8 +36,43 @@ func main() {
 
 	configCmd := commands.NewConfigCommand()
 	configCmd.Action = func(context *cli.Context) error {
-		// Do something
-		return nil
+		if err := tlog.InitLogger(debug, false); err != nil {
+			return err
+		}
+
+		if err := verifySeverities(); err != nil {
+			return err
+		}
+
+		scanPath, _ := os.Getwd()
+		if context.NArg() > 0 {
+			// when scan path provided, use that
+			scanPath = context.Args().First()
+		}
+		tlog.Logger.Debugf("Using scanPath %s", scanPath)
+
+		client, err := buildClient.Get(scanPath)
+		if err != nil {
+			return err
+		}
+
+		results, err := scanner.Scan(scanPath, severities, debug)
+		if err != nil {
+			return err
+		}
+
+		processedResults := processor.ProcessResults(client, results)
+		if err != nil {
+			return err
+		}
+
+		if !skipResultUpload {
+			if err := uploader.Upload(client, processedResults, tags); err != nil {
+				return err
+			}
+		}
+
+		return checkPolicyResults(processedResults)
 	}
 	configCmd.Flags = append(configCmd.Flags,
 		&cli.StringFlag{
